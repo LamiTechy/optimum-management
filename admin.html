@@ -1,0 +1,796 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>OPM — Admin Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700;800;900&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { overflow-x: hidden; scroll-behavior: smooth; }
+body { overflow-x: hidden; }
+
+:root {
+  --primary: #1a1a2e;
+  --primary-light: #2d2d4a;
+  --gold: #c9a84c;
+  --gold-light: #e4c86a;
+  --gold-pale: #faf3e0;
+  --gold-subtle: rgba(201, 168, 76, 0.12);
+  --accent: #8b7355;
+  --surface: #fcf9f3;
+  --card: #ffffff;
+  --border: #ede5d3;
+  --text: #1a1a2e;
+  --muted: #7a7282;
+  --success: #2d9c76;
+  --error: #e11d48;
+  --shadow: 0 8px 40px rgba(26, 26, 46, 0.08);
+  --shadow-hover: 0 12px 56px rgba(26, 26, 46, 0.14);
+  --radius: 14px;
+}
+
+body {
+  font-family: 'Inter', sans-serif;
+  background: var(--surface);
+  min-height: 100vh;
+  color: var(--text);
+}
+
+::-webkit-scrollbar { width: 8px; }
+::-webkit-scrollbar-track { background: var(--surface); }
+::-webkit-scrollbar-thumb { background: var(--gold-subtle); border-radius: 999px; }
+::-webkit-scrollbar-thumb:hover { background: var(--gold); }
+
+#toast-container {
+  position: fixed;
+  top: 24px;
+  right: 24px;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.toast {
+  padding: 16px 24px;
+  border-radius: 14px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #fff;
+  box-shadow: 0 12px 40px rgba(26, 26, 46, 0.2);
+  animation: toastIn 0.3s ease;
+  max-width: 420px;
+}
+
+.toast.out { animation: toastOut 0.3s ease forwards; }
+.toast.success { background: var(--success); }
+.toast.error { background: var(--error); }
+
+@keyframes toastIn { from { opacity: 0; transform: translateX(40px); } to { opacity: 1; transform: translateX(0); } }
+@keyframes toastOut { from { opacity: 1; transform: translateX(0); } to { opacity: 0; transform: translateX(40px); } }
+
+#admin-view { min-height: 100vh; background: var(--surface); }
+
+.admin-topbar {
+  background: linear-gradient(160deg, var(--primary) 0%, #16162a 40%, var(--primary-light) 100%);
+  padding: 0 36px;
+  height: 80px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: 0 8px 32px rgba(26, 26, 46, 0.2);
+  position: relative;
+  overflow: hidden;
+}
+
+.admin-topbar::before {
+  content: '';
+  position: absolute;
+  top: -60px;
+  right: -20px;
+  width: 200px;
+  height: 200px;
+  background: radial-gradient(circle, rgba(201,168,76,0.08) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+.admin-topbar::after {
+  content: '';
+  position: absolute;
+  bottom: -80px;
+  left: -40px;
+  width: 180px;
+  height: 180px;
+  background: radial-gradient(circle, rgba(255,255,255,0.03) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+.admin-topbar .topbar-accent {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--gold), var(--gold-light), transparent);
+  pointer-events: none;
+}
+
+.admin-topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.admin-topbar-logo {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: rgba(201,168,76,0.12);
+  border: 2px solid rgba(201,168,76,0.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.admin-topbar-logo svg { width: 24px; height: 24px; }
+
+.admin-topbar-left h2 {
+  font-family: 'Playfair Display', serif;
+  font-size: 20px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.admin-topbar-left h2 span { color: var(--gold-light); }
+
+.admin-topbar-left .admin-sub {
+  font-size: 12px;
+  color: rgba(255,255,255,0.55);
+  display: block;
+  margin-top: 2px;
+}
+
+.admin-topbar-right { display: flex; gap: 10px; align-items: center; }
+
+.btn-topbar {
+  padding: 10px 18px;
+  font-size: 13px;
+  font-family: 'Inter', sans-serif;
+  font-weight: 600;
+  border-radius: 12px;
+  cursor: pointer;
+  border: none;
+  transition: all 0.2s ease;
+}
+
+.btn-refresh { background: rgba(255,255,255,0.1); color: #fff; }
+.btn-refresh:hover { background: rgba(255,255,255,0.18); }
+.btn-logout { background: rgba(201, 168, 76, 0.15); color: var(--gold-light); border: 1px solid rgba(201, 168, 76, 0.2); }
+.btn-logout:hover { background: rgba(201, 168, 76, 0.25); }
+
+.admin-content { padding: 36px 32px 48px; max-width: 1160px; margin: 0 auto; }
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 18px;
+  margin-bottom: 28px;
+}
+
+.stat-card {
+  background: var(--card);
+  border-radius: 18px;
+  padding: 26px 28px;
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.stat-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-hover); }
+
+.stat-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, var(--gold), var(--gold-light));
+}
+
+.stat-card .s-num {
+  font-family: 'Playfair Display', serif;
+  font-size: 36px;
+  font-weight: 700;
+  color: var(--primary);
+  line-height: 1;
+  margin-bottom: 8px;
+}
+
+.stat-card .s-lbl {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.stat-card .s-icon {
+  position: absolute;
+  top: 20px; right: 20px;
+  font-size: 26px;
+  opacity: 0.1;
+  color: var(--primary);
+}
+
+.table-card {
+  background: var(--card);
+  border-radius: 18px;
+  border: 1px solid var(--border);
+  overflow: hidden;
+  box-shadow: var(--shadow);
+}
+
+.table-card-head {
+  padding: 22px 28px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border);
+}
+
+.table-card-head h3 {
+  font-family: 'Playfair Display', serif;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--primary);
+}
+
+.sub-count {
+  font-size: 12px;
+  color: var(--muted);
+  background: var(--gold-subtle);
+  padding: 6px 16px;
+  border-radius: 999px;
+  font-weight: 600;
+}
+
+.table-scroll { overflow-x: auto; }
+table { width: 100%; min-width: 640px; border-collapse: collapse; font-size: 13px; }
+
+th {
+  background: var(--gold-pale);
+  padding: 14px 18px;
+  text-align: left;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--accent);
+  white-space: nowrap;
+  border-bottom: 1px solid var(--border);
+}
+
+td {
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: var(--gold-pale); }
+
+.badge-yes { background: var(--gold-subtle); color: var(--primary); padding: 5px 12px; border-radius: 999px; font-size: 11px; font-weight: 700; }
+.badge-no  { background: #fff1f2; color: var(--error); padding: 5px 12px; border-radius: 999px; font-size: 11px; font-weight: 700; }
+
+.btn-view {
+  padding: 8px 18px;
+  font-size: 12px;
+  font-weight: 700;
+  font-family: 'Inter', sans-serif;
+  background: var(--primary);
+  color: var(--gold-light);
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  white-space: nowrap;
+}
+
+.btn-view:hover { background: var(--primary-light); box-shadow: 0 6px 18px rgba(26, 26, 46, 0.2); transform: translateY(-1px); }
+
+#admin-login {
+  display: none;
+  min-height: 100vh;
+  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+  align-items: center;
+  justify-content: center;
+  padding: 28px;
+}
+
+#admin-login.active { display: flex; }
+
+.login-card {
+  background: var(--card);
+  border-radius: 24px;
+  padding: 44px 40px;
+  width: 100%;
+  max-width: 420px;
+  box-shadow: 0 34px 90px rgba(26, 26, 46, 0.25);
+  text-align: center;
+  border: 1px solid rgba(201, 168, 76, 0.15);
+  animation: fadeUp 0.5s ease;
+}
+
+@keyframes fadeUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+
+.login-logo-badge {
+  width: 84px; height: 84px;
+  border-radius: 18px;
+  background: linear-gradient(135deg, rgba(201,168,76,0.12), rgba(201,168,76,0.04));
+  border: 2px solid rgba(201,168,76,0.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 20px;
+}
+
+.login-logo-badge svg { width: 44px; height: 44px; }
+
+.login-card h2 {
+  font-family: 'Playfair Display', serif;
+  font-size: 26px;
+  color: var(--primary);
+  margin-bottom: 10px;
+}
+
+.login-card p {
+  font-size: 14px;
+  color: var(--muted);
+  margin-bottom: 26px;
+}
+
+.login-card input {
+  width: 100%;
+  padding: 14px 18px;
+  border: 1.5px solid var(--border);
+  border-radius: 14px;
+  font-family: 'Inter', sans-serif;
+  font-size: 15px;
+  outline: none;
+  margin-bottom: 18px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  background: #fdfcf8;
+}
+
+.login-card input:focus { border-color: var(--gold); box-shadow: 0 0 0 5px rgba(201, 168, 76, 0.12); }
+
+.btn-login {
+  width: 100%;
+  padding: 16px;
+  background: linear-gradient(135deg, var(--gold), var(--gold-light));
+  color: var(--primary);
+  border: none;
+  border-radius: 14px;
+  font-family: 'Inter', sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 12px 30px rgba(201, 168, 76, 0.25);
+}
+
+.btn-login:hover { box-shadow: 0 16px 34px rgba(201, 168, 76, 0.3); transform: translateY(-1px); }
+
+.login-err { color: var(--error); font-size: 13px; margin-top: 12px; }
+
+#admin-panel { display: none; }
+#admin-panel.active { display: block; }
+
+.modal-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(26, 26, 46, 0.78);
+  z-index: 1000;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  backdrop-filter: blur(6px);
+}
+
+.modal-overlay.open { display: flex; }
+
+.modal {
+  background: var(--surface);
+  border-radius: 24px;
+  width: 100%;
+  max-width: 720px;
+  max-height: 92vh;
+  overflow-y: auto;
+  box-shadow: 0 30px 90px rgba(26, 26, 46, 0.25);
+  animation: slideUp 0.3s ease;
+}
+
+@keyframes slideUp { from {opacity:0; transform:translateY(30px);} to {opacity:1; transform:translateY(0);} }
+
+.modal-header {
+  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+  padding: 24px 28px;
+  border-radius: 24px 24px 0 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky; top: 0; z-index: 1;
+}
+
+.modal-header h3 { font-family: 'Playfair Display', serif; font-size: 22px; color: #fff; font-weight: 700; }
+
+.modal-header .modal-sub { font-size: 12px; color: rgba(255,255,255,0.6); margin-top: 2px; }
+
+.modal-close {
+  width: 38px; height: 38px;
+  background: rgba(255,255,255,0.1);
+  border: none; color: var(--gold-light);
+  border-radius: 50%; font-size: 18px;
+  cursor: pointer; display: flex;
+  align-items: center; justify-content: center;
+  transition: background 0.18s;
+}
+
+.modal-close:hover { background: rgba(255,255,255,0.2); }
+
+.modal-body { padding: 30px 28px 32px; }
+
+.modal-section { margin-bottom: 24px; }
+
+.modal-section-title {
+  font-size: 10px; font-weight: 700;
+  letter-spacing: 2px; text-transform: uppercase;
+  color: var(--primary);
+  margin-bottom: 16px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid var(--gold-subtle);
+  display: flex; align-items: center; gap: 10px;
+}
+
+.modal-section-title::before {
+  content: '';
+  width: 4px; height: 14px;
+  background: var(--gold);
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.modal-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+.modal-grid.single { grid-template-columns: 1fr; }
+.modal-field label { display: block; font-size: 11px; font-weight: 700; letter-spacing: 0.9px; text-transform: uppercase; color: var(--accent); margin-bottom: 5px; }
+.modal-field .val { font-size: 14px; color: var(--text); font-weight: 500; }
+.modal-sig { border: 1px solid var(--border); border-radius: 14px; padding: 16px; background: var(--card); text-align: center; }
+.modal-sig img { max-width: 100%; max-height: 140px; border-radius: 10px; }
+
+.loading { text-align:center; padding:48px; color:var(--muted); }
+.empty-state { text-align:center; padding:48px; color:var(--muted); font-size:14px; }
+
+.skeleton-row {
+  display: flex;
+  gap: 16px;
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--border);
+  align-items: center;
+}
+
+.skeleton-cell {
+  height: 14px;
+  background: linear-gradient(90deg, var(--border) 25%, var(--gold-pale) 50%, var(--border) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: 6px;
+}
+
+@keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+
+@media (max-width: 768px) {
+  .stats-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .stat-card { padding: 18px; border-radius: 12px; }
+  .stat-card .s-num { font-size: 28px; }
+  .admin-topbar { padding: 0 16px; height: 56px; }
+  .admin-topbar-left h2 { font-size: 16px; }
+  .admin-topbar-left .admin-sub { display: none; }
+  .admin-topbar-left img { width: 34px; height: 34px; }
+  .admin-content { padding: 16px; }
+  .table-card-head { padding: 14px 16px; flex-wrap: wrap; gap: 8px; }
+  .table-card-head h3 { font-size: 16px; }
+  td, th { padding: 10px 12px; }
+  .modal-overlay { padding: 12px; align-items: flex-end; }
+  .modal { border-radius: 20px 20px 0 0; max-height: 92vh; }
+  .modal-header { padding: 18px 20px; border-radius: 20px 20px 0 0; }
+  .modal-body { padding: 18px; }
+  .modal-grid,
+  .modal-grid.single { grid-template-columns: 1fr; gap: 12px; }
+  .login-card { padding: 36px 28px; border-radius: 16px; }
+  #toast-container { top: 12px; right: 12px; left: 12px; }
+  .toast { font-size: 13px; padding: 14px 18px; max-width: 100%; }
+}
+</style>
+</head>
+<body>
+
+<div id="toast-container"></div>
+
+<!-- ===== ADMIN VIEW ===== -->
+<div id="admin-view">
+  <div id="admin-login">
+    <div class="login-card">
+      <div class="login-logo-badge">
+        <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="4" y="16" width="32" height="20" rx="2" stroke="#c9a84c" stroke-width="2.5" fill="rgba(201,168,76,0.08)"/>
+          <path d="M4 18L20 6L36 18" stroke="#c9a84c" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+          <rect x="16" y="24" width="8" height="12" rx="1" fill="#c9a84c" opacity="0.6"/>
+          <text x="20" y="11" text-anchor="middle" font-family="'Playfair Display', serif" font-weight="700" font-size="10" fill="#c9a84c">OPM</text>
+        </svg>
+      </div>
+      <h2>Admin Access</h2>
+      <p>Enter your password to view rental applications</p>
+      <input type="password" id="admin-pw" placeholder="Enter password" onkeydown="if(event.key==='Enter') adminLogin()"/>
+      <button class="btn-login" onclick="adminLogin()">Access Dashboard</button>
+      <div class="login-err" id="admin-err"></div>
+    </div>
+  </div>
+
+  <div id="admin-panel">
+    <div class="admin-topbar">
+      <div class="topbar-accent"></div>
+      <div class="admin-topbar-left">
+        <div class="admin-topbar-logo">
+          <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="4" y="16" width="32" height="20" rx="2" stroke="#e4c86a" stroke-width="2.5" fill="rgba(228,200,106,0.08)"/>
+            <path d="M4 18L20 6L36 18" stroke="#e4c86a" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+            <rect x="16" y="24" width="8" height="12" rx="1" fill="#e4c86a" opacity="0.6"/>
+            <text x="20" y="11" text-anchor="middle" font-family="'Playfair Display', serif" font-weight="700" font-size="10" fill="#e4c86a">OPM</text>
+          </svg>
+        </div>
+        <div>
+          <h2>Optimum <span>Property Management</span></h2>
+          <span class="admin-sub">Admin Dashboard — Rental Applications</span>
+        </div>
+      </div>
+      <div class="admin-topbar-right">
+        <button class="btn-topbar btn-refresh" onclick="loadSubmissions()">↻ Refresh</button>
+        <button class="btn-topbar btn-logout" onclick="adminLogout()">Logout</button>
+      </div>
+    </div>
+
+    <div class="admin-content">
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="s-icon"><i data-lucide="clipboard-list" style="width:28px;height:28px;stroke:var(--primary);stroke-width:1.5;"></i></div>
+          <div class="s-num" id="stat-total">—</div>
+          <div class="s-lbl">Total Applications</div>
+        </div>
+        <div class="stat-card">
+          <div class="s-icon"><i data-lucide="car" style="width:28px;height:28px;stroke:var(--primary);stroke-width:1.5;"></i></div>
+          <div class="s-num" id="stat-vehicles">—</div>
+          <div class="s-lbl">Have Vehicles</div>
+        </div>
+        <div class="stat-card">
+          <div class="s-icon"><i data-lucide="paw-print" style="width:28px;height:28px;stroke:var(--primary);stroke-width:1.5;"></i></div>
+          <div class="s-num" id="stat-pets">—</div>
+          <div class="s-lbl">Have Pets</div>
+        </div>
+        <div class="stat-card">
+          <div class="s-icon"><i data-lucide="alert-triangle" style="width:28px;height:28px;stroke:var(--primary);stroke-width:1.5;"></i></div>
+          <div class="s-num" id="stat-evicted">—</div>
+          <div class="s-lbl">Evicted Before</div>
+        </div>
+      </div>
+
+      <div class="table-card">
+        <div class="table-card-head">
+          <h3>All Applications</h3>
+          <span class="sub-count" id="sub-count">Loading...</span>
+        </div>
+        <div class="table-scroll">
+          <div id="table-body" class="loading">Loading submissions...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL -->
+<div class="modal-overlay" id="detail-modal" onclick="if(event.target===this) closeModal()">
+  <div class="modal">
+    <div class="modal-header">
+      <div>
+        <h3 id="modal-name">Applicant Details</h3>
+        <div class="modal-sub" id="modal-submitted"></div>
+      </div>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body" id="modal-body"></div>
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL = 'https://utcvvicmvbstdrmhkzlk.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV0Y3Z2aWNtdmJzdGRybWhremxrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQwNzM5NjMsImV4cCI6MjA4OTY0OTk2M30.agHRpX57eL3nXwiWbbOtD-srlyR-sgB_E4q-vdtpDXc';
+const { createClient } = supabase;
+const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const ADMIN_PASSWORD = 'admin123';
+const TABLE = 'a_applications';
+
+function showToast(message, type) {
+  const container = document.getElementById('toast-container');
+  const el = document.createElement('div');
+  el.className = 'toast ' + type;
+  el.innerHTML = (type === 'success' ? '\u2713' : '\u2716') + ' ' + message;
+  container.appendChild(el);
+  setTimeout(function() { el.classList.add('out'); setTimeout(function() { el.remove(); }, 300); }, 3500);
+}
+
+// ===== ADMIN AUTH =====
+function adminLogin() {
+  var pw = document.getElementById('admin-pw').value;
+  if (pw === ADMIN_PASSWORD) {
+    sessionStorage.setItem('opm_admin', '1');
+    document.getElementById('admin-login').classList.remove('active');
+    showAdminPanel();
+  } else {
+    document.getElementById('admin-err').textContent = '\u2716 Incorrect password';
+  }
+}
+
+function adminLogout() {
+  sessionStorage.removeItem('opm_admin');
+  document.getElementById('admin-panel').classList.remove('active');
+  document.getElementById('admin-login').classList.add('active');
+  document.getElementById('admin-pw').value = '';
+  document.getElementById('admin-err').textContent = '';
+}
+
+function showAdminPanel() {
+  document.getElementById('admin-panel').classList.add('active');
+  loadSubmissions();
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+}
+
+// ===== LOAD SUBMISSIONS =====
+async function loadSubmissions() {
+  document.getElementById('table-body').innerHTML = Array(5).fill(0).map(function() {
+    return '<div class="skeleton-row">' +
+      '<div class="skeleton-cell" style="width:24px"></div>' +
+      '<div class="skeleton-cell" style="width:140px"></div>' +
+      '<div class="skeleton-cell" style="width:120px"></div>' +
+      '<div class="skeleton-cell" style="width:160px"></div>' +
+      '<div class="skeleton-cell" style="width:100px"></div>' +
+      '<div class="skeleton-cell" style="width:60px"></div>' +
+      '<div class="skeleton-cell" style="width:60px"></div>' +
+      '<div class="skeleton-cell" style="width:60px"></div>' +
+      '<div class="skeleton-cell" style="width:100px"></div>' +
+      '<div class="skeleton-cell" style="width:100px"></div>' +
+      '<div class="skeleton-cell" style="width:70px"></div>' +
+    '</div>';
+  }).join('');
+  try {
+    var result = await db.from(TABLE).select('*').order('submitted_at', { ascending: false });
+    if (result.error) throw result.error;
+    renderTable(result.data);
+  } catch(err) {
+    document.getElementById('table-body').innerHTML = '<div class="empty-state" style="color:var(--error)">Error: ' + err.message + '</div>';
+  }
+}
+
+function renderTable(rows) {
+  document.getElementById('stat-total').textContent = rows.length;
+  document.getElementById('stat-vehicles').textContent = rows.filter(function(r) { return r.has_vehicle === 'YES'; }).length;
+  document.getElementById('stat-pets').textContent = rows.filter(function(r) { return r.has_pets === 'YES'; }).length;
+  document.getElementById('stat-evicted').textContent = rows.filter(function(r) { return r.been_evicted === 'YES'; }).length;
+  document.getElementById('sub-count').textContent = rows.length + ' records';
+  if (rows.length === 0) {
+    document.getElementById('table-body').innerHTML = '<div class="empty-state">No submissions yet.</div>';
+    return;
+  }
+  window._allRows = rows;
+  var html = '<table><thead><tr>' +
+    '<th>#</th><th>Name</th><th>Phone</th><th>Email</th>' +
+    '<th>App Date</th><th>Vehicle</th><th>Pets</th><th>Evicted</th>' +
+    '<th>Payment</th><th>Submitted</th><th></th>' +
+    '</tr></thead><tbody>';
+  for (var i = 0; i < rows.length; i++) {
+    var r = rows[i];
+    html += '<tr>' +
+      '<td style="color:var(--muted);font-size:12px">' + (i + 1) + '</td>' +
+      '<td><strong>' + (r.first_name || '') + ' ' + (r.last_name || '') + '</strong></td>' +
+      '<td>' + (r.phone || '\u2014') + '</td>' +
+      '<td style="font-size:12px">' + (r.email || '\u2014') + '</td>' +
+      '<td style="font-size:12px;white-space:nowrap">' + (r.app_date || '\u2014') + '</td>' +
+      '<td><span class="badge-' + (r.has_vehicle === 'YES' ? 'yes' : 'no') + '">' + (r.has_vehicle || '\u2014') + '</span></td>' +
+      '<td><span class="badge-' + (r.has_pets === 'YES' ? 'yes' : 'no') + '">' + (r.has_pets || '\u2014') + '</span></td>' +
+      '<td><span class="badge-' + (r.been_evicted === 'YES' ? 'yes' : 'no') + '">' + (r.been_evicted || '\u2014') + '</span></td>' +
+      '<td style="font-size:12px">' + (r.payment_methods || '\u2014') + '</td>' +
+      '<td style="font-size:11px;white-space:nowrap">' + (r.submitted_at ? new Date(r.submitted_at).toLocaleString() : '\u2014') + '</td>' +
+      '<td><button class="btn-view" onclick="openModal(' + i + ')">View \u2192</button></td>' +
+      '</tr>';
+  }
+  html += '</tbody></table>';
+  document.getElementById('table-body').innerHTML = html;
+}
+
+// ===== MODAL =====
+function openModal(index) {
+  var r = window._allRows[index];
+  if (!r) return;
+  document.getElementById('modal-name').textContent = ((r.first_name || '') + ' ' + (r.last_name || '')).trim() || 'Applicant';
+  document.getElementById('modal-submitted').textContent = r.submitted_at ? 'Submitted: ' + new Date(r.submitted_at).toLocaleString() : '';
+  function badge(v) { return '<span class="badge-' + (v === 'YES' ? 'yes' : 'no') + '">' + (v || '\u2014') + '</span>'; }
+  function val(v) { return '<span class="val">' + (v || '\u2014') + '</span>'; }
+  var body = '' +
+    '<div class="modal-section">' +
+      '<div class="modal-section-title">Personal Information</div>' +
+      '<div class="modal-grid">' +
+        '<div class="modal-field"><label>First Name</label>' + val(r.first_name) + '</div>' +
+        '<div class="modal-field"><label>Last Name</label>' + val(r.last_name) + '</div>' +
+        '<div class="modal-field"><label>Phone</label>' + val(r.phone) + '</div>' +
+        '<div class="modal-field"><label>Email</label>' + val(r.email) + '</div>' +
+        '<div class="modal-field"><label>Application Date</label>' + val(r.app_date) + '</div>' +
+        '<div class="modal-field"><label>Moving Date</label>' + val(r.moving_date) + '</div>' +
+        '<div class="modal-field"><label>Occupation</label>' + val(r.occupation) + '</div>' +
+        '<div class="modal-field"><label>No. of Occupants</label>' + val(r.occupants) + '</div>' +
+      '</div>' +
+    '</div>' +
+    '<div class="modal-section">' +
+      '<div class="modal-section-title">Property Questions</div>' +
+      '<div class="modal-grid">' +
+        '<div class="modal-field"><label>Has Vehicle?</label>' + badge(r.has_vehicle) + '</div>' +
+        '<div class="modal-field"><label>Has Pets?</label>' + badge(r.has_pets) + '</div>' +
+        '<div class="modal-field"><label>Been Evicted?</label>' + badge(r.been_evicted) + '</div>' +
+      '</div>' +
+    '</div>' +
+    '<div class="modal-section">' +
+      '<div class="modal-section-title">Current Address</div>' +
+      '<div class="modal-grid single">' +
+        '<div class="modal-field"><label>Street Address</label>' + val(r.addr_street1) + '</div>' +
+        (r.addr_street2 ? '<div class="modal-field"><label>Address Line 2</label>' + val(r.addr_street2) + '</div>' : '') +
+      '</div>' +
+      '<div class="modal-grid">' +
+        '<div class="modal-field"><label>City</label>' + val(r.addr_city) + '</div>' +
+        '<div class="modal-field"><label>State</label>' + val(r.addr_state) + '</div>' +
+        '<div class="modal-field"><label>Zip Code</label>' + val(r.addr_zip) + '</div>' +
+      '</div>' +
+    '</div>' +
+    '<div class="modal-section">' +
+      '<div class="modal-section-title">Payment Method</div>' +
+      '<div class="modal-grid single">' +
+        '<div class="modal-field"><label>Selected Methods</label><span class="val">' + (r.payment_methods || '\u2014') + '</span></div>' +
+      '</div>' +
+    '</div>' +
+    (r.signature_data ? '<div class="modal-section">' +
+      '<div class="modal-section-title">Signature</div>' +
+      '<div class="modal-sig"><img src="' + r.signature_data + '" alt="Signature"/></div>' +
+    '</div>' : '');
+  document.getElementById('modal-body').innerHTML = body;
+  document.getElementById('detail-modal').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeModal() {
+  document.getElementById('detail-modal').classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+document.addEventListener('keydown', function(e) { if (e.key === 'Escape') closeModal(); });
+
+// Auto-login check on page load
+if (sessionStorage.getItem('opm_admin') === '1') {
+  document.getElementById('admin-login').classList.remove('active');
+  document.getElementById('admin-panel').classList.add('active');
+  showAdminPanel();
+}
+</script>
+</body>
+</html>
